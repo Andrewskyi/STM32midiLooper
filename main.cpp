@@ -316,7 +316,7 @@ int main(void)
 					continue;
 				}
 
-				if(specialKey2 == 0 && b3 > 0)
+				if(specialKey2 == 0 && b3 > 0 && key != specialKey)
 				{
 					specialKey2 = key;
 					continue;
@@ -329,13 +329,11 @@ int main(void)
 					{
 						masterLoop.endLoop();
 						//printf("end master loop\r\n");
-						GPIO_SetBits(GPIOC, GPIO_Pin_13);
 					}
 					else
 					{
 						masterLoop.beginLoop();
 						//printf("begin master loop\r\n");
-						GPIO_ResetBits(GPIOC, GPIO_Pin_13);
 					}
 				}
 				else if((key == specialKey2) && b3 > 0 &&
@@ -345,13 +343,11 @@ int main(void)
 					{
 						slaveLoop.endLoop();
 						//printf("end slave loop\r\n");
-						GPIO_SetBits(GPIOC, GPIO_Pin_13);
 					}
 					else
 					{
 						slaveLoop.beginLoop();
 						//printf("begin slave loop\r\n");
-						GPIO_ResetBits(GPIOC, GPIO_Pin_13);
 					}
 				}
 				else if(key != specialKey &&
@@ -377,7 +373,10 @@ int main(void)
 			sysMsg2 = !sysMsg1;
 
 			if(theLoop && theSlaveLoop)
-				theSlaveLoop->timeTick( theLoop->timeTick() );
+				theSlaveLoop->timeTick(
+					theLoop->timeTick()
+				)
+				;
 		}
 
     	// special key assignment

@@ -13,7 +13,7 @@ MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength,
 		bool master) :
 	currentState(state),
 	buf(buf), bufLength(bufLength),
-	currentTime(0), currentMasterLoop(0),
+	currentTime(0), currentMasterLoop(0), loopEndTime(0), masterLoopEndTime(0),
 	masterLoopCount(0), eventCount(0), playIdx(0), sendEventPending(false),
 	sender(sender),
 	master(master),
@@ -36,6 +36,8 @@ uint32_t MidiLoop::timeTick()
 	else
 	{
 		currentTime = 0;
+		playIdx = 0;
+		noteOnOffCount = 0;
 	}
 
 	return currentTime;
@@ -56,6 +58,12 @@ void MidiLoop::timeTick(uint32_t masterTime)
 	}
 
 	currentTime = masterTime;
+
+	if(currentTime == loopEndTime && currentMasterLoop == masterLoopEndTime)
+	{
+		playIdx = 0;
+		noteOnOffCount = 0;
+	}
 }
 
 void MidiLoop::beginLoop()
@@ -76,15 +84,21 @@ void MidiLoop::endLoop()
 	}
 
 	state = PLAYING;
-	playIdx = 0;
+	//playIdx = 0;
 	sendEventPending = false;
-	if(eventCount > 0)
-	  buf[0].time = currentTime;
+//	if(eventCount > 0)
+//	  buf[0].time = currentTime;
 	loopEndTime = currentTime;
+	masterLoopEndTime = currentMasterLoop;
+	//currentTime = 0;
+
 	noteOnOffCount = 0;
 
-	masterLoopCount = currentMasterLoop==0 ? 1 : currentMasterLoop ;
-	currentMasterLoop = 0;
+	if(!master)
+	{
+		masterLoopCount = currentMasterLoop==0 ? 1 : currentMasterLoop ;
+		currentMasterLoop = 0;
+	}
 }
 
 void MidiLoop::midiEvent(char b1, char b2, char b3)
@@ -110,6 +124,7 @@ void MidiLoop::midiEvent(char b1, char b2, char b3)
 			}
 
 			loopEndTime = 0xFFFFFFFF;
+			masterLoopEndTime = 0xFFFFFFFF;
 			currentMasterLoop = 0;
 			masterLoopCount = 0xFFFFFFFF;
 		}
@@ -131,7 +146,11 @@ void MidiLoop::play()
 
 	if(!sendEventPending)
 	{
-		if(event.time <= currentTime && event.loopIdx == currentMasterLoop)
+		bool fireCondition = master ?
+			(event.time == currentTime) :
+		    ((event.time == currentTime) && event.loopIdx == currentMasterLoop);
+
+		if(fireCondition)
 		{
 			sendEventPending = true;
 		}
@@ -154,18 +173,20 @@ void MidiLoop::play()
 
 			// redy to send next event
 			sendEventPending = false;
-			playIdx++;
 
-			if(playIdx >= eventCount)
+			if((playIdx + 1) >= eventCount)
 			{
 				playIdx = 0;
-				noteOnOffCount = 0;
+			}
+			else
+			{
+				playIdx++;
 			}
 
-			if(playIdx == 1 && master)
-			{
-				currentTime = 0;
-			}
+//			if(playIdx == 0 && master)
+//			{
+//				currentTime = 0;
+//			}
 		}
 	}
 }

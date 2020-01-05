@@ -48,16 +48,17 @@ private:
 	const uint32_t bufLength;
 	volatile uint32_t currentTime;
 	volatile uint32_t currentMasterLoop;
-	uint32_t loopEndTime;
-	uint32_t masterLoopCount;
-	uint32_t eventCount;
-	uint32_t playIdx;
-	bool sendEventPending;
+	volatile uint32_t loopEndTime;
+	volatile uint32_t masterLoopEndTime;
+	volatile uint32_t masterLoopCount;
+	volatile uint32_t eventCount;
+	volatile uint32_t playIdx;
+	volatile bool sendEventPending;
 	MidiSender& sender;
 	bool master;
 	State state;
-	uint32_t noteOnOffCount;
-	bool beginLoopRequested;
+	volatile uint32_t noteOnOffCount;
+	volatile bool beginLoopRequested;
 
 	void play();
 };
