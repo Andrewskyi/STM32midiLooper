@@ -110,17 +110,13 @@ void MidiLoop::endLoop()
 	state = PLAYING;
 	sendEventPending = false;
 	loopEndTime = currentTime;
-	//masterLoopEndTime = currentMasterLoop;
 	noteOnOffCount = 0;
 
 	if(!master && eventCount > 0)
 	{
-		masterLoopCount = buf[eventCount-1].loopIdx + 1
-				/*currentMasterLoop==0 ? 1 : */
-				//currentMasterLoop + 1
-				;
+		masterLoopCount = buf[eventCount-1].loopIdx + 1;
 		currentMasterLoop = 0;
-		deltaTime = currentTime - buf[0].time - 1;
+		deltaTime = currentTime - buf[0].time;
 	}
 }
 
@@ -147,7 +143,6 @@ void MidiLoop::midiEvent(char b1, char b2, char b3)
 			}
 
 			loopEndTime = 0xFFFFFFFF;
-			//masterLoopEndTime = 0xFFFFFFFF;
 			currentMasterLoop = 0;
 			masterLoopCount = 0xFFFFFFFF;
 		}
@@ -169,9 +164,6 @@ void MidiLoop::play()
 
 	if(!sendEventPending)
 	{
-//		bool fireCondition = master ?
-//			(event.time == currentTime) :
-//		    ((event.time == currentTime) && event.loopIdx == currentMasterLoop);
 		bool fireCondition = ((event.time == currentTime) &&
 				(event.loopIdx == currentMasterLoop));
 
