@@ -49,7 +49,7 @@ private:
 	volatile uint32_t currentTime;
 	volatile uint32_t currentMasterLoop;
 	volatile uint32_t loopEndTime;
-	volatile uint32_t masterLoopEndTime;
+	//volatile uint32_t masterLoopEndTime;
 	volatile uint32_t masterLoopCount;
 	volatile uint32_t eventCount;
 	volatile uint32_t playIdx;

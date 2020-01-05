@@ -13,7 +13,7 @@ MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength,
 		bool master) :
 	currentState(state),
 	buf(buf), bufLength(bufLength),
-	currentTime(0), currentMasterLoop(0), loopEndTime(0), masterLoopEndTime(0),
+	currentTime(0), currentMasterLoop(0), loopEndTime(0), /*masterLoopEndTime(0),*/
 	masterLoopCount(0), eventCount(0), playIdx(0), sendEventPending(false),
 	sender(sender),
 	master(master),
@@ -45,7 +45,7 @@ uint32_t MidiLoop::timeTick()
 
 void MidiLoop::timeTick(uint32_t masterTime)
 {
-	if(masterTime <= currentTime && masterLoopCount > 0)
+	if(masterTime < currentTime && masterLoopCount > 0)
 	{
 		if((currentMasterLoop + 1) >= masterLoopCount)
 		{
@@ -59,7 +59,7 @@ void MidiLoop::timeTick(uint32_t masterTime)
 
 	currentTime = masterTime;
 
-	if(currentTime == loopEndTime && currentMasterLoop == masterLoopEndTime)
+	if(currentTime >= loopEndTime && (currentMasterLoop + 1) >= masterLoopCount)
 	{
 		playIdx = 0;
 		noteOnOffCount = 0;
@@ -84,20 +84,17 @@ void MidiLoop::endLoop()
 	}
 
 	state = PLAYING;
-	//playIdx = 0;
 	sendEventPending = false;
-//	if(eventCount > 0)
-//	  buf[0].time = currentTime;
 	loopEndTime = currentTime;
-	masterLoopEndTime = currentMasterLoop;
-	//currentTime = 0;
-
+	//masterLoopEndTime = currentMasterLoop;
 	noteOnOffCount = 0;
 
-	if(!master)
+	if(!master && eventCount > 0)
 	{
-		masterLoopCount = currentMasterLoop==0 ? 1 : currentMasterLoop ;
-		currentMasterLoop = 0;
+		masterLoopCount = //buf[eventCount-1].loopIdx + 1
+				/*currentMasterLoop==0 ? 1 : */
+				currentMasterLoop + 1;
+		//currentMasterLoop = 0;
 	}
 }
 
@@ -124,7 +121,7 @@ void MidiLoop::midiEvent(char b1, char b2, char b3)
 			}
 
 			loopEndTime = 0xFFFFFFFF;
-			masterLoopEndTime = 0xFFFFFFFF;
+			//masterLoopEndTime = 0xFFFFFFFF;
 			currentMasterLoop = 0;
 			masterLoopCount = 0xFFFFFFFF;
 		}
@@ -146,9 +143,11 @@ void MidiLoop::play()
 
 	if(!sendEventPending)
 	{
-		bool fireCondition = master ?
-			(event.time == currentTime) :
-		    ((event.time == currentTime) && event.loopIdx == currentMasterLoop);
+//		bool fireCondition = master ?
+//			(event.time == currentTime) :
+//		    ((event.time == currentTime) && event.loopIdx == currentMasterLoop);
+		bool fireCondition = ((event.time == currentTime) &&
+				(event.loopIdx == currentMasterLoop));
 
 		if(fireCondition)
 		{
@@ -174,19 +173,10 @@ void MidiLoop::play()
 			// redy to send next event
 			sendEventPending = false;
 
-			if((playIdx + 1) >= eventCount)
-			{
-				playIdx = 0;
-			}
-			else
+			if((playIdx + 1) < eventCount)
 			{
 				playIdx++;
 			}
-
-//			if(playIdx == 0 && master)
-//			{
-//				currentTime = 0;
-//			}
 		}
 	}
 }
