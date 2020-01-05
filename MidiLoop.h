@@ -59,6 +59,9 @@ private:
 	State state;
 	volatile uint32_t noteOnOffCount;
 	volatile bool beginLoopRequested;
+	volatile uint32_t maxMasterTime;
+	volatile int32_t deltaTime;
+	volatile uint32_t lastMasterTime;
 
 	void play();
 };

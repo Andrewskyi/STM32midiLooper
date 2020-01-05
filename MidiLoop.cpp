@@ -18,7 +18,8 @@ MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength,
 	sender(sender),
 	master(master),
 	state(RECORDING),
-	noteOnOffCount(0), beginLoopRequested(false)
+	noteOnOffCount(0), beginLoopRequested(false),
+	maxMasterTime(0), deltaTime(0), lastMasterTime(0)
 {
 	//printf("MidiLoop: buf=%u, bufLength=%u", buf, bufLength);
 }
@@ -45,7 +46,29 @@ uint32_t MidiLoop::timeTick()
 
 void MidiLoop::timeTick(uint32_t masterTime)
 {
-	if(masterTime < currentTime && masterLoopCount > 0)
+	// find max master time
+	if(masterTime < lastMasterTime)
+	{
+		maxMasterTime = lastMasterTime;
+	}
+	lastMasterTime = masterTime;
+
+	// calculate time mapping
+	int32_t tmp = (int32_t)masterTime + deltaTime;
+
+	if(tmp < 0)
+	{
+		tmp = tmp + maxMasterTime + 1;
+	}
+	else if(tmp > (int32_t)maxMasterTime)
+	{
+		tmp = tmp - maxMasterTime - 1;
+	}
+
+	masterTime = (uint32_t)tmp;
+
+
+	if(masterTime < currentTime)
 	{
 		if((currentMasterLoop + 1) >= masterLoopCount)
 		{
@@ -59,7 +82,8 @@ void MidiLoop::timeTick(uint32_t masterTime)
 
 	currentTime = masterTime;
 
-	if(currentTime >= loopEndTime && (currentMasterLoop + 1) >= masterLoopCount)
+	if(eventCount > 0 &&
+		buf[0].time == currentTime && buf[0].loopIdx == currentMasterLoop)
 	{
 		playIdx = 0;
 		noteOnOffCount = 0;
@@ -91,10 +115,12 @@ void MidiLoop::endLoop()
 
 	if(!master && eventCount > 0)
 	{
-		masterLoopCount = //buf[eventCount-1].loopIdx + 1
+		masterLoopCount = buf[eventCount-1].loopIdx + 1
 				/*currentMasterLoop==0 ? 1 : */
-				currentMasterLoop + 1;
-		//currentMasterLoop = 0;
+				//currentMasterLoop + 1
+				;
+		currentMasterLoop = 0;
+		deltaTime = currentTime - buf[0].time - 1;
 	}
 }
 
@@ -193,5 +219,6 @@ void MidiLoop::tick()
 		beginLoopRequested = false;
 		state = RECORDING;
 		eventCount = 0;
+		deltaTime = 0;
 	}
 }
