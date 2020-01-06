@@ -47,13 +47,37 @@ uint32_t MidiLoop::timeTick()
 void MidiLoop::timeTick(uint32_t masterTime)
 {
 	// find max master time
-	if(masterTime < lastMasterTime)
+	if(masterTime < lastMasterTime) // TODO - slabizna
 	{
 		maxMasterTime = lastMasterTime;
 	}
 	lastMasterTime = masterTime;
 
-	// calculate time mapping
+	shiftMasterTime(masterTime);
+
+
+	if(masterTime < currentTime)
+	{
+		currentMasterLoop++;
+
+		if(currentMasterLoop >= masterLoopCount)
+		{
+			currentMasterLoop = 0;
+		}
+	}
+
+	currentTime = masterTime;
+
+	if(eventCount > 0 &&
+		buf[0].time == currentTime && buf[0].loopIdx == currentMasterLoop)
+	{
+		playIdx = 0;
+		noteOnOffCount = 0;
+	}
+}
+
+void MidiLoop::shiftMasterTime(uint32_t& masterTime)
+{
 	int32_t tmp = (int32_t)masterTime + deltaTime;
 
 	if(tmp < 0)
@@ -66,28 +90,6 @@ void MidiLoop::timeTick(uint32_t masterTime)
 	}
 
 	masterTime = (uint32_t)tmp;
-
-
-	if(masterTime < currentTime)
-	{
-		if((currentMasterLoop + 1) >= masterLoopCount)
-		{
-			currentMasterLoop = 0;
-		}
-		else
-		{
-			currentMasterLoop++;
-		}
-	}
-
-	currentTime = masterTime;
-
-	if(eventCount > 0 &&
-		buf[0].time == currentTime && buf[0].loopIdx == currentMasterLoop)
-	{
-		playIdx = 0;
-		noteOnOffCount = 0;
-	}
 }
 
 void MidiLoop::beginLoop()
@@ -116,7 +118,11 @@ void MidiLoop::endLoop()
 	{
 		masterLoopCount = buf[eventCount-1].loopIdx + 1;
 		currentMasterLoop = 0;
-		deltaTime = currentTime - buf[0].time;
+		// calculate time shift
+		deltaTime = (int32_t)(buf[0].time) - (int32_t)currentTime;
+		// play first event immediately
+		currentTime = buf[0].time;
+		playIdx = 0;
 	}
 }
 
@@ -154,7 +160,7 @@ void MidiLoop::midiEvent(char b1, char b2, char b3)
 	}
 	else
 	{
-		printf("ovflw,e=%u,bl=%u\r\n", eventCount, bufLength);
+		//printf("ovflw,e=%u,bl=%u\r\n", eventCount, bufLength);
 	}
 }
 

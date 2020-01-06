@@ -64,6 +64,7 @@ private:
 	volatile uint32_t lastMasterTime;
 
 	void play();
+	void shiftMasterTime(uint32_t& masterTime);
 };
 
 #endif /* MIDILOOP_H_ */
