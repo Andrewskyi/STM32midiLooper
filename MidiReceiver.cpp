@@ -8,8 +8,8 @@
 #include "MidiReceiver.h"
 #include <stdio.h>
 
-MidiReceiver::MidiReceiver(_MIDI_recByte recFunc) :
-	recFunc(recFunc), runningStatusByte(buf[0]), bytesCount(0)
+MidiReceiver::MidiReceiver(_MIDI_recByte recFunc, MidiSender* midiThru) :
+	recFunc(recFunc), midiThru(midiThru), runningStatusByte(buf[0]), bytesCount(0)
 {
 }
 
@@ -62,6 +62,11 @@ bool MidiReceiver::nextEvent(char& b1, char& b2, char& b3)
 			b3 = buf[2];
 
 			bytesCount = 1;
+
+			if(midiThru)
+			{
+				midiThru->sendMidi(b1, b2, b3);
+			}
 			//printf("6\r\n");
 			return true;
 		}

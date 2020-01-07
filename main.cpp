@@ -283,7 +283,7 @@ int main(void)
 
     //USARTSend(" Hello.\r\nUSART1 is ready.\r\n");
 	MidiSender sender(sendMidi);
-	MidiReceiver receiver(recMidi);
+	MidiReceiver receiver(recMidi, &sender);
 
     MidiLoop masterLoop(midiEvents, EV_LEN, sender, true);
     MidiLoop slaveLoop(midiEvents2, EV_LEN, sender, false);
