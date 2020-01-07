@@ -20,8 +20,9 @@ public:
 	bool nextEvent(char& b1, char& b2, char& b3);
 private:
 	_MIDI_recByte recFunc;
+	char& runningStatusByte;
 	char buf[3];
-	uint32_t bytesCount;
+	volatile uint32_t bytesCount;
 };
 
 #endif /* MIDIRECEIVER_H_ */

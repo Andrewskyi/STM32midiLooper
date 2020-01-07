@@ -194,7 +194,7 @@ void MidiLoop::play()
 				noteOnOffCount--;
 			}
 
-			// redy to send next event
+			// ready to send next event
 			sendEventPending = false;
 
 			if((playIdx + 1) < eventCount)
