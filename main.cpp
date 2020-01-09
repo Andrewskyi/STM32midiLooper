@@ -310,58 +310,58 @@ int main(void)
 		{
     		key = (b1<<8)|b2;
 
-				if(specialKey == 0 && b3 > 0)
-				{
-					specialKey = key;
-					continue;
-				}
+			if(specialKey == 0 && b3 > 0)
+			{
+				specialKey = key;
+				continue;
+			}
 
-				if(specialKey2 == 0 && b3 > 0 && key != specialKey)
-				{
-					specialKey2 = key;
-					continue;
-				}
+			if(specialKey2 == 0 && b3 > 0 && key != specialKey)
+			{
+				specialKey2 = key;
+				continue;
+			}
 
-				if((key == specialKey) && b3 > 0 &&
-						slaveLoop.currentState != MidiLoop::RECORDING)
+			if((key == specialKey) && b3 > 0 &&
+					slaveLoop.currentState != MidiLoop::RECORDING)
+			{
+				if(masterLoop.currentState == MidiLoop::RECORDING)
 				{
-					if(masterLoop.currentState == MidiLoop::RECORDING)
-					{
-						masterLoop.endLoop();
-						//printf("end master loop\r\n");
-					}
-					else
-					{
-						masterLoop.beginLoop();
-						//printf("begin master loop\r\n");
-					}
+					masterLoop.endLoop();
+					//printf("end master loop\r\n");
 				}
-				else if((key == specialKey2) && b3 > 0 &&
-						masterLoop.currentState != MidiLoop::RECORDING)
+				else
 				{
-					if(slaveLoop.currentState == MidiLoop::RECORDING)
-					{
-						slaveLoop.endLoop();
-						//printf("end slave loop\r\n");
-					}
-					else
-					{
-						slaveLoop.beginLoop();
-						//printf("begin slave loop\r\n");
-					}
+					masterLoop.beginLoop();
+					//printf("begin master loop\r\n");
 				}
-				else if(key != specialKey &&
-						masterLoop.currentState == MidiLoop::RECORDING)
+			}
+			else if((key == specialKey2) && b3 > 0 &&
+					masterLoop.currentState != MidiLoop::RECORDING)
+			{
+				if(slaveLoop.currentState == MidiLoop::RECORDING)
 				{
-					//printf("4:evt\r\n");
-					masterLoop.midiEvent(b1, b2, b3);
+					slaveLoop.endLoop();
+					//printf("end slave loop\r\n");
 				}
-				else if(key != specialKey2 &&
-						slaveLoop.currentState == MidiLoop::RECORDING)
+				else
 				{
-					//printf("4:evt\r\n");
-					slaveLoop.midiEvent(b1, b2, b3);
+					slaveLoop.beginLoop();
+					//printf("begin slave loop\r\n");
 				}
+			}
+			else if(key != specialKey &&
+					masterLoop.currentState == MidiLoop::RECORDING)
+			{
+				//printf("4:evt\r\n");
+				masterLoop.midiEvent(b1, b2, b3);
+			}
+			else if(key != specialKey2 &&
+					slaveLoop.currentState == MidiLoop::RECORDING)
+			{
+				//printf("4:evt\r\n");
+				slaveLoop.midiEvent(b1, b2, b3);
+			}
 		}
 
     	masterLoop.tick();

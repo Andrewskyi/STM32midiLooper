@@ -22,9 +22,13 @@ public:
 private:
 	_MIDI_recByte recFunc;
     MidiSender* midiThru;
-	char& runningStatusByte;
+	volatile char runningStatusByte;
+	volatile uint32_t expectedBytesCount;
 	char buf[3];
 	volatile uint32_t bytesCount;
+	volatile char systemRealTimeEvent;
+
+	uint32_t expectedChannelVoiceMsgBytesCount();
 };
 
 #endif /* MIDIRECEIVER_H_ */

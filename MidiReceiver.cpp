@@ -9,7 +9,8 @@
 #include <stdio.h>
 
 MidiReceiver::MidiReceiver(_MIDI_recByte recFunc, MidiSender* midiThru) :
-	recFunc(recFunc), midiThru(midiThru), runningStatusByte(buf[0]), bytesCount(0)
+	recFunc(recFunc), midiThru(midiThru), runningStatusByte(0), bytesCount(0),
+	systemRealTimeEvent(0)
 {
 }
 
@@ -23,54 +24,120 @@ bool MidiReceiver::nextEvent(char& b1, char& b2, char& b3)
 
 	if(recFunc(b))
 	{
-		if((b & 0xF0) == 0x90 || (b & 0xF0) == 0x80)
+		// Channel Voice Message
+		if(b >= 0x80 && b <= 0xEF)
 		{
 			runningStatusByte = b;
 			bytesCount = 1;
-			//printf("1\r\n");
+
+			expectedBytesCount = expectedChannelVoiceMsgBytesCount();
 		}
-		else if((b & 0xF0) == 0xF0)
+		// Channel Voice Message
+
+		// System Common Messages
+		else if(b >= 0xF0 && b <= 0xF7)
 		{
 			runningStatusByte = 0;
-			bytesCount = 0;
-			//printf("2\r\n");
+			buf[0] = b;
+
+			switch(b)
+			{
+			case 0xF0:
+			case 0xF7:
+				// ignore message
+				expectedBytesCount = 0;
+				bytesCount = 0;
+				break;
+			case 0xF1:
+			case 0xF3:
+				expectedBytesCount = 2;
+				bytesCount = 1;
+				break;
+			case 0xF2:
+				expectedBytesCount = 3;
+				bytesCount = 1;
+				break;
+			case 0xF4:
+			case 0xF5:
+			case 0xF6:
+				expectedBytesCount = 1;
+				bytesCount = 1;
+				break;
+			}
 		}
-		else if(runningStatusByte == 0)
+		// System Common Messages
+
+		// System Real-Time Messages
+		else if(b >= 0xF8)
 		{
-			// simply ignore the messages
-			//printf("3\r\n");
-			return false;
+			systemRealTimeEvent = b;
 		}
-		else if(runningStatusByte != 0 && b <= 127 && bytesCount < 3)
+		// System Real-Time Messages
+
+		else if(b <= 127 && bytesCount < expectedBytesCount)
 		{
 			buf[bytesCount] = b;
-			//printf("4:%X\r\n", bytesCount);
 			bytesCount++;
 		}
-		else
-		{
-			//printf("5\r\n");
-			runningStatusByte = 0;
-			bytesCount = 0;
-			return false;
-		}
 
-		if(bytesCount == 3)
-		{
-			b1 = buf[0];
-			b2 = buf[1];
-			b3 = buf[2];
+		bool eventForLooper = false;
 
-			bytesCount = 1;
+		if(bytesCount > 0 && bytesCount == expectedBytesCount)
+		{
+			if(runningStatusByte > 0)
+			{
+				buf[0] = runningStatusByte;
+			}
+
+			//printf("%X %X %X\r\n", buf[0], buf[1], buf[2]);
+			//printf("%X\r\n", buf[0]);
 
 			if(midiThru)
 			{
-				midiThru->sendMidi(b1, b2, b3);
+				midiThru->sendMidi(buf[0], buf[1], buf[2]);
 			}
-			//printf("6\r\n");
-			return true;
+
+			if(bytesCount == 3 &&
+				((runningStatusByte & 0xF0) == 0x80 ||
+				 (runningStatusByte & 0xF0) == 0x90))
+			{
+				b1 = buf[0];
+				b2 = buf[1];
+				b3 = buf[2];
+
+				eventForLooper = true;
+			}
+
+			if(runningStatusByte > 0)
+			{
+				bytesCount = 1;
+				expectedBytesCount = expectedChannelVoiceMsgBytesCount();
+			}
+			else
+			{
+				bytesCount = 0;
+				expectedBytesCount = 0;
+			}
 		}
+		else if(systemRealTimeEvent)
+		{
+			systemRealTimeEvent = 0;
+		}
+
+		return eventForLooper;
 	}
 
 	return false;
+}
+
+uint32_t MidiReceiver::expectedChannelVoiceMsgBytesCount()
+{
+	switch(runningStatusByte & 0xF0)
+	{
+	case 0xC0:
+	case 0xD0:
+		return 2;
+	default:
+		return 3;
+	}
 }
