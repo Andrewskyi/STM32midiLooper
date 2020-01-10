@@ -19,6 +19,7 @@ public:
 	virtual ~MidiReceiver();
 
 	bool nextEvent(char& b1, char& b2, char& b3);
+	void tick();
 private:
 	_MIDI_recByte recFunc;
     MidiSender* midiThru;

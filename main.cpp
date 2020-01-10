@@ -366,6 +366,7 @@ int main(void)
 
     	masterLoop.tick();
     	slaveLoop.tick();
+    	receiver.tick();
     	sender.tick();
 
     	if(sysMsg1 == sysMsg2)

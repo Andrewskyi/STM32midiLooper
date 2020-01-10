@@ -94,7 +94,7 @@ bool MidiReceiver::nextEvent(char& b1, char& b2, char& b3)
 
 			if(midiThru)
 			{
-				midiThru->sendMidi(buf[0], buf[1], buf[2]);
+				midiThru->sendMidi(buf, bytesCount);
 			}
 
 			if(bytesCount == 3 &&
@@ -119,15 +119,29 @@ bool MidiReceiver::nextEvent(char& b1, char& b2, char& b3)
 				expectedBytesCount = 0;
 			}
 		}
-		else if(systemRealTimeEvent)
-		{
-			systemRealTimeEvent = 0;
-		}
 
 		return eventForLooper;
 	}
 
 	return false;
+}
+
+void MidiReceiver::tick()
+{
+	if(systemRealTimeEvent)
+	{
+		if(midiThru)
+		{
+			if(midiThru->sendRealTimeMidi(systemRealTimeEvent))
+			{
+				systemRealTimeEvent = 0;
+			}
+		}
+		else
+		{
+			systemRealTimeEvent = 0;
+		}
+	}
 }
 
 uint32_t MidiReceiver::expectedChannelVoiceMsgBytesCount()

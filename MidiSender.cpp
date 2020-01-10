@@ -8,7 +8,7 @@
 #include "MidiSender.h"
 
 MidiSender::MidiSender(_MIDI_sendByte sendFunc) :
-	sendFunc(sendFunc), writePos(0), readPos(0), fifoLen(0), currentByte(0)
+	sendFunc(sendFunc), writePos(0), readPos(0), fifoLen(0)
 {
 
 }
@@ -17,32 +17,43 @@ MidiSender::~MidiSender()
 {
 }
 
-bool MidiSender::sendMidi(char b1, char b2, char b3)
+bool MidiSender::sendMidi(char*const buf, uint32_t length)
 {
-	if(fifoLen < MIDI_SENDER_QUEUE_LEN)
+	if((fifoLen + length) <= MIDI_SENDER_QUEUE_LEN)
 	{
-		MidiEvent& ev = eventQueue[writePos];
-
-		ev.buf[0] = b1;
-		ev.buf[1] = b2;
-		ev.buf[2] = b3;
-
-		if(writePos < (MIDI_SENDER_QUEUE_LEN - 1))
+		for(uint32_t i=0; i<length; i++)
 		{
-			writePos++;
-		}
-		else
-		{
-			writePos = 0;
+			bytesQueue[writePos] = buf[i];
+
+			if(writePos < (MIDI_SENDER_QUEUE_LEN - 1))
+			{
+				writePos++;
+			}
+			else
+			{
+				writePos = 0;
+			}
 		}
 
-		fifoLen++;
+		fifoLen += length;
 		tick();
 
 		return true;
 	}
 
 	return false;
+}
+
+bool MidiSender::sendRealTimeMidi(char b)
+{
+	return sendFunc(b);
+}
+
+bool MidiSender::sendMidi(char b1, char b2, char b3)
+{
+	char buf2[3] = {b1, b2, b3};
+
+	return sendMidi(buf2, 3);
 }
 
 void MidiSender::tick()
@@ -52,17 +63,7 @@ void MidiSender::tick()
 		return;
 	}
 
-	if(currentByte < 3)
-	{
-		MidiEvent& ev = eventQueue[readPos];
-
-		if(sendFunc(ev.buf[currentByte]))
-		{
-			currentByte++;
-		}
-	}
-
-	if(currentByte == 3)
+	if(sendFunc(bytesQueue[readPos]))
 	{
 		if(readPos < (MIDI_SENDER_QUEUE_LEN - 1))
 		{
@@ -74,6 +75,5 @@ void MidiSender::tick()
 		}
 
 		fifoLen--;
-		currentByte = 0;
 	}
 }
