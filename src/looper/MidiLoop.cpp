@@ -9,47 +9,54 @@
 #include <stdio.h>
 
 MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength, MidiSender& sender,
-		bool master) :
-		currentState(state), isSecondHalf(_isSecondHalf),
-		queueFull(_queueFull),
+		MidiLoop const * const masterPtr) :
+		currentState(state),
+		currentTime(_currentTime),
+		loopEndTime(_loopEndTime),
+		isSecondHalf(_isSecondHalf),
+		loopFull(_loopFull),
 		stateChangeRequested(beginLoopRequested),
 		buf(buf), bufLength(bufLength),
-		currentTime(0), currentMasterLoop(0),
-		loopEndTime(0), loopEndTimeHalf(0), _isSecondHalf(false),
-		masterLoopCount(0), eventCount(0), playIdx(0), sendEventPending(false), sender(
-				sender), master(master), state(RECORDING), noteOnOffCount(0), beginLoopRequested(
-				false), maxMasterTime(0), deltaTime(0), lastMasterTime(0) {
+		_currentTime(0), currentMasterLoop(0),
+		_loopEndTime(0), loopEndTimeHalf(0), _isSecondHalf(false),
+		masterLoopCount(0), eventCount(0), playIdx(0), sendEventPending(false),
+		sender(sender), masterPtr(masterPtr),
+		state(RECORDING), noteOnOffCount(0),
+		beginLoopRequested(false), deltaTime(0), lastMasterTime(0) {
 	//printf("MidiLoop: buf=%u, bufLength=%u", buf, bufLength);
 }
 
 MidiLoop::~MidiLoop() {
 }
 
-uint32_t MidiLoop::timeTick() {
-	if (currentTime < loopEndTime) {
-		currentTime++;
-		_isSecondHalf = (currentTime >= loopEndTimeHalf);
-	} else {
-		currentTime = 0;
-		_isSecondHalf = false;
-		playIdx = 0;
-		noteOnOffCount = 0;
+uint32_t MidiLoop::midiTimeTick() {
+	if(!masterPtr)
+	{
+		if (_currentTime < _loopEndTime) {
+			_currentTime++;
+			_isSecondHalf = (_currentTime >= loopEndTimeHalf);
+		} else {
+			_currentTime = 0;
+			_isSecondHalf = false;
+			playIdx = 0;
+			noteOnOffCount = 0;
+		}
+	}
+	else
+	{
+		slaveMidiTimeTick();
 	}
 
-	return currentTime;
+	return _currentTime;
 }
 
-void MidiLoop::timeTick(uint32_t masterTime) {
-	// find max master time
-	if (masterTime < lastMasterTime) // TODO - slabizna
-			{
-		maxMasterTime = lastMasterTime;
-	}
-	lastMasterTime = masterTime;
+void MidiLoop::slaveMidiTimeTick()
+{
+	uint32_t masterTime = masterPtr->currentTime;
 
 	shiftMasterTime(masterTime);
 
-	if (masterTime < currentTime) {
+	if (masterTime < _currentTime) {
 		currentMasterLoop++;
 
 		if (currentMasterLoop >= masterLoopCount) {
@@ -57,16 +64,19 @@ void MidiLoop::timeTick(uint32_t masterTime) {
 		}
 	}
 
-	currentTime = masterTime;
+	_currentTime = masterTime;
 
-	if (eventCount > 0 && buf[0].time == currentTime
-			&& buf[0].loopIdx == currentMasterLoop) {
+	if (eventCount > 0 && buf[0].time == _currentTime &&
+			buf[0].loopIdx == currentMasterLoop)
+	{
 		playIdx = 0;
 		noteOnOffCount = 0;
 	}
 }
 
-void MidiLoop::shiftMasterTime(uint32_t& masterTime) {
+void MidiLoop::shiftMasterTime(uint32_t& masterTime)
+{
+	uint32_t maxMasterTime = masterPtr->loopEndTime;
 	int32_t tmp = (int32_t) masterTime + deltaTime;
 
 	if (tmp < 0) {
@@ -93,18 +103,18 @@ void MidiLoop::endLoop() {
 
 	state = PLAYING;
 	sendEventPending = false;
-	loopEndTime = currentTime;
-	loopEndTimeHalf = loopEndTime >> 1;
+	_loopEndTime = _currentTime;
+	loopEndTimeHalf = _loopEndTime >> 1;
 	noteOnOffCount = 0;
-	_queueFull = false;
+	_loopFull = false;
 
-	if (!master && eventCount > 0) {
+	if (masterPtr/*this is slave*/ && eventCount > 0) {
 		masterLoopCount = buf[eventCount - 1].loopIdx + 1;
 		currentMasterLoop = 0;
 		// calculate time shift
-		deltaTime = (int32_t) (buf[0].time) - (int32_t) currentTime;
+		deltaTime = (int32_t) (buf[0].time) - (int32_t) _currentTime;
 		// play first event immediately
-		currentTime = buf[0].time;
+		_currentTime = buf[0].time;
 		playIdx = 0;
 	}
 }
@@ -122,22 +132,22 @@ void MidiLoop::midiEvent(char b1, char b2, char b3) {
 		event.b3 = b3;
 
 		if (eventCount == 0) {
-			if (master) {
-				currentTime = 0;
+			if (!masterPtr/*this is master*/) {
+				_currentTime = 0;
 			}
 
-			loopEndTime = 0xFFFFFFFF;
-			loopEndTimeHalf = loopEndTime >> 1;
+			_loopEndTime = 0xFFFFFFFF;
+			loopEndTimeHalf = _loopEndTime >> 1;
 			currentMasterLoop = 0;
 			masterLoopCount = 0xFFFFFFFF;
 		}
-		//printf("ev, t=%X, l=%X\r\n", currentTime, currentMasterLoop);
+		//printf("ev, t=%X, l=%X\r\n", _currentTime, currentMasterLoop);
 		//printf("e=%X\r\n",b2);
-		event.time = currentTime;
+		event.time = _currentTime;
 		event.loopIdx = currentMasterLoop;
 		eventCount++;
 	} else {
-		_queueFull = true;
+		_loopFull = true;
 	}
 }
 
@@ -145,7 +155,7 @@ void MidiLoop::play() {
 	MidiEvent& event = buf[playIdx];
 
 	if (!sendEventPending) {
-		bool fireCondition = ((event.time == currentTime)
+		bool fireCondition = ((event.time == _currentTime)
 				&& (event.loopIdx == currentMasterLoop));
 
 		if (fireCondition) {
@@ -157,7 +167,7 @@ void MidiLoop::play() {
 		if (sender.sendMidi(event.b1, event.b2, event.b3)) {
 
 //			printf("b2=%X, b3=%X, idx=%X, ct=%X, et=%X\r\n",
-//			  event.b2, event.b3, playIdx, currentTime, event.time);
+//			  event.b2, event.b3, playIdx, _currentTime, event.time);
 
 			// on/off counting
 			if (((event.b1 & 0xF0) == 0x90) && event.b3 > 0) {

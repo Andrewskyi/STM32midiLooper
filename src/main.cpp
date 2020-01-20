@@ -22,15 +22,6 @@ void usart_init(void)
 	/* Enable USART2 clock */
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
-//	/* NVIC Configuration */
-//	NVIC_InitTypeDef NVIC_InitStructure;
-//	/* Enable the USARTx Interrupt */
-//	NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-//	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-//	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-//	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-//	NVIC_Init(&NVIC_InitStructure);
-
 	/* Configure the GPIOs */
 	GPIO_InitTypeDef GPIO_InitStructure;
 
@@ -86,34 +77,6 @@ void usart_init(void)
 
 	/* Enable USART2 */
 	USART_Cmd(USART2, ENABLE);
-
-	/* Enable the USART1 Receive interrupt: this interrupt is generated when the
-		USART1 receive data register is not empty */
-	//USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
-}
-
-
-bool usart1send(char b)
-{
-	if(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET)
-	{
-		return false;
-	}
-
-	USART_SendData(USART1, b);
-
-	return true;
-}
-
-SystemOut sysOut(usart1send);
-
-extern "C" {
-
-
-void sysOutSend(char *buf, uint32_t length)
-{
-	sysOut.send(buf, length);
-}
 }
 
 void SetSysClockTo72(void)
@@ -180,16 +143,22 @@ bool sysMsg1, sysMsg2;
 
 extern "C" void SysTick_Handler()
 {
-//	uint8_t pinState2 = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_7);
-//	GPIO_WriteBit(GPIOA, GPIO_Pin_7, (BitAction)(pinState2 ? 0 : 1));
-
 	if(sysMsg1 != sysMsg2)
 	{
 		sysMsg1 = sysMsg2;
 	}
+}
 
-//	if(theLoop && theSlaveLoop)
-//		theSlaveLoop->timeTick( theLoop->timeTick() );
+bool usart1send(char b)
+{
+	if(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET)
+	{
+		return false;
+	}
+
+	USART_SendData(USART1, b);
+
+	return true;
 }
 
 bool sendMidi(char b)
@@ -231,47 +200,36 @@ bool recMidi(char& b)
 MidiLoop::MidiEvent midiEvents[EV_LEN];
 MidiLoop::MidiEvent midiEvents2[EV_LEN];
 
-uint32_t specialKey;
+uint32_t specialKey1;
 uint32_t specialKey2;
 
 Leds leds;
 MidiSender sender(sendMidi);
 MidiReceiver receiver(recMidi, &sender);
 
-MidiLoop masterLoop(midiEvents, EV_LEN, sender, true);
-MidiLoop slaveLoop(midiEvents2, EV_LEN, sender, false);
+MidiLoop masterLoop(midiEvents, EV_LEN, sender);
+MidiLoop slaveLoop(midiEvents2, EV_LEN, sender, &masterLoop);
+
+SystemOut sysOut(usart1send);
+
+extern "C" void sysOutSend(char *buf, uint32_t length)
+{
+	sysOut.send(buf, length);
+}
 
 int main(void)
 {
 	// Set System clock
 	SetSysClockTo72();
 
-//	/* Initialize LED which connected to PC13 */
-//	GPIO_InitTypeDef  GPIO_InitStructure;
-//	// Enable PORTC Clock
-//	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-//	/* Configure the GPIO_LED pin */
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//	GPIO_Init(GPIOB, &GPIO_InitStructure);
-//
-//	GPIO_ResetBits(GPIOB, GPIO_Pin_11); // Set C13 to Low level ("0")
+	// Initialize USART
 	usart_init();
-    // Initialize USART
-
-
-//    /* Configure temp sys tick pin */
-//    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	// SysTick Init
 	SysTick_Config(SystemCoreClock / MIDI_TIME_DIV);
 
     //USARTSend(" Hello.\r\nUSART1 is ready.\r\n");
-	specialKey = 0;
+	specialKey1 = 0;
     specialKey2 = 0;
 
     leds.init();
@@ -290,15 +248,15 @@ int main(void)
 		{
     		key = (b1<<8)|b2;
 
-			if(specialKey == 0 && b3 > 0)
+			if(specialKey1 == 0 && b3 > 0)
 			{
-				specialKey = key;
+				specialKey1 = key;
 			}
-			else if(specialKey2 == 0 && b3 > 0 && key != specialKey)
+			else if(specialKey2 == 0 && b3 > 0 && key != specialKey1)
 			{
 				specialKey2 = key;
 			}
-			else if((key == specialKey) && b3 > 0 &&
+			else if((key == specialKey1) && b3 > 0 &&
 					slaveLoop.currentState != MidiLoop::RECORDING)
 			{
 				if(masterLoop.currentState == MidiLoop::RECORDING)
@@ -326,7 +284,7 @@ int main(void)
 					//printf("begin slave loop\r\n");
 				}
 			}
-			else if(key != specialKey &&
+			else if(key != specialKey1 &&
 					masterLoop.currentState == MidiLoop::RECORDING)
 			{
 				//printf("4:evt\r\n");
@@ -351,7 +309,8 @@ int main(void)
 		{
 			sysMsg2 = !sysMsg1;
 
-			slaveLoop.timeTick(masterLoop.timeTick());
+			masterLoop.midiTimeTick();
+			slaveLoop.midiTimeTick();
 
 			leds.tick();
 		}
@@ -372,10 +331,10 @@ int main(void)
     	}
 
     	// loop overflow indication
-    	if(CONDITION_CHANGED(masterLoop.queueFull || slaveLoop.queueFull))
+    	if(CONDITION_CHANGED(masterLoop.loopFull || slaveLoop.loopFull))
     	{
 			leds.setState(Leds::OVERFLOW0,
-				masterLoop.queueFull || slaveLoop.queueFull);
+				masterLoop.loopFull || slaveLoop.loopFull);
     	}
 
     	// sender / receiver overflow indication
@@ -394,11 +353,11 @@ int main(void)
 			leds.fastBlink(Leds::LOOP_STATE1);
 		}
 
-    	if(specialKey == 0)
+    	if(specialKey1 == 0)
 		{
 			leds.fastBlink(Leds::LOOP_STATE0 | Leds::LOOP_STATE1);
 		}
-		else if(specialKey != 0 && specialKey2 == 0)
+		else if(specialKey1 != 0 && specialKey2 == 0)
 		{
 			leds.off(Leds::LOOP_STATE0);
 			leds.fastBlink(Leds::LOOP_STATE1);
