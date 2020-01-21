@@ -284,6 +284,15 @@ int main(void)
 					//printf("begin slave loop\r\n");
 				}
 			}
+			else if((b1 & 0xF0) == 0xB0) // control change
+			{
+				if(b2 == 14) // tempo change
+				{
+					int32_t correction = ((static_cast<int>(b3) - 63) << 4);
+					uint32_t divider = MIDI_TIME_DIV + correction;
+					SysTick_Config(SystemCoreClock / divider);
+				}
+			}
 			else if(key != specialKey1 &&
 					masterLoop.currentState == MidiLoop::RECORDING)
 			{

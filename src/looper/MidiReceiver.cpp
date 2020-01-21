@@ -85,9 +85,14 @@ bool MidiReceiver::nextEvent(char& b1, char& b2, char& b3) {
 				midiThru->sendMidi(buf, bytesCount);
 			}
 
-			if (bytesCount == 3
-					&& ((runningStatusByte & 0xF0) == 0x80
-							|| (runningStatusByte & 0xF0) == 0x90)) {
+			if (bytesCount == 3 &&
+				(
+				    (runningStatusByte & 0xF0) == 0x80 ||
+					(runningStatusByte & 0xF0) == 0x90 ||
+					(runningStatusByte & 0xF0) == 0xB0
+				)
+			)
+			{
 				b1 = buf[0];
 				b2 = buf[1];
 				b3 = buf[2];

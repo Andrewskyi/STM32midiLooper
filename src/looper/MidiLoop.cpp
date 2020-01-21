@@ -56,7 +56,8 @@ void MidiLoop::slaveMidiTimeTick()
 
 	shiftMasterTime(masterTime);
 
-	if (masterTime < _currentTime) {
+	if (masterTime < _currentTime)
+	{
 		currentMasterLoop++;
 
 		if (currentMasterLoop >= masterLoopCount) {
@@ -104,19 +105,24 @@ void MidiLoop::endLoop() {
 	state = PLAYING;
 	sendEventPending = false;
 	_loopEndTime = _currentTime;
-	loopEndTimeHalf = _loopEndTime >> 1;
-	noteOnOffCount = 0;
-	_loopFull = false;
 
-	if (masterPtr/*this is slave*/ && eventCount > 0) {
-		masterLoopCount = buf[eventCount - 1].loopIdx + 1;
+	if (masterPtr/*this is slave*/ && eventCount > 0)
+	{
+		const auto& lastEvent = buf[eventCount - 1];
 		currentMasterLoop = 0;
 		// calculate time shift
 		deltaTime = (int32_t) (buf[0].time) - (int32_t) _currentTime;
+		// loop as short as possible
+		_loopEndTime = lastEvent.time;
+		masterLoopCount = lastEvent.loopIdx + 1;
 		// play first event immediately
 		_currentTime = buf[0].time;
 		playIdx = 0;
 	}
+
+	loopEndTimeHalf = _loopEndTime >> 1;
+	noteOnOffCount = 0;
+	_loopFull = false;
 }
 
 void MidiLoop::midiEvent(char b1, char b2, char b3) {
