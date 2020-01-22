@@ -1,3 +1,31 @@
+/*
+ * main.cpp
+ *
+ *  Created on: 18.01.2020
+ *      Author: apaluch
+ *
+ *      MIT License
+ *      Copyright (c) 2020 apaluch
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
 #include "stm32f10x.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -16,22 +44,23 @@
 
 void usart_init(void)
 {
-	/* Enable USART1 and GPIOA clock */
+	// Enable USART1 and GPIOA clock
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
 
-	/* Enable USART2 clock */
+	// Enable USART2 clock
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
-	/* Configure the GPIOs */
+	// Configure the GPIOs
 	GPIO_InitTypeDef GPIO_InitStructure;
 
-	/* Configure USART1 Tx (PA.09), USART2 Tx (PA.02) as alternate function push-pull */
+	// Configure USART1 Tx (PA.09), USART2 Tx (PA.02) as
+	// alternate function push-pull */
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_2;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	/* Configure USART1 Rx (PA.10), USART2 Rx (PA.03) as input floating */
+	// Configure USART1 Rx (PA.10), USART2 Rx (PA.03) as input floating
 	GPIO_InitStructure.GPIO_Pin = /*GPIO_Pin_10 |*/ GPIO_Pin_3;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
@@ -39,20 +68,7 @@ void usart_init(void)
 	/* Configure the USART1 */
 	USART_InitTypeDef USART_InitStructure;
 
-	/* USART1 configuration ------------------------------------------------------*/
-	/* USART1 configured as follow:
-		- BaudRate = 115200 baud
-		- Word Length = 8 Bits
-		- One Stop Bit
-		- No parity
-		- Hardware flow control disabled (RTS and CTS signals)
-		- Receive and transmit enabled
-		- USART Clock disabled
-		- USART CPOL: Clock is active low
-		- USART CPHA: Data is captured on the middle
-		- USART LastBit: The clock pulse of the last data bit is not output to
-			the SCLK pin
-	 */
+	// USART1 configuration
 	USART_InitStructure.USART_BaudRate = 115200;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;

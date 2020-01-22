@@ -72,7 +72,7 @@ int _kill(int32_t pid, int32_t sig)
 
 void _exit(int32_t status)
 {
-	while (1) {}		/* Make sure we hang here */
+	while (1) {} /* Make sure we hang here */
 }
 
 void sysOutSend(char *buf, uint32_t length);
@@ -86,15 +86,6 @@ int _write(int file, char *ptr, int len)
 
     return len;
 }
-
-//int _write(int32_t file, uint8_t *ptr, int32_t len)
-//{
-//	/* Implement your write code here, this is used by puts and printf for example */
-//	/* return len; */
-//
-//	errno = ENOSYS;
-//	return -1;
-//}
 
 void * _sbrk(int32_t incr)
 {
