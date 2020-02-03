@@ -37,6 +37,8 @@ SOFTWARE.
 
 #include "looper/SystemOut.h"
 #include <looper/Leds.h>
+#include "looper/MidiEventMasterBuffer.h"
+#include "looper/MidiEventSlaveBuffer.h"
 #include "looper/MidiLoop.h"
 #include "looper/MidiSender.h"
 #include "looper/MidiReceiver.h"
@@ -212,9 +214,9 @@ bool recMidi(char& b)
 
 
 #define MIDI_TIME_DIV (2000)
-#define EV_LEN 400
-MidiLoop::MidiEvent midiEvents[EV_LEN];
-MidiLoop::MidiEvent midiEvents2[EV_LEN];
+#define EV_LEN (9700)
+uint8_t masterBuffer_raw[EV_LEN];
+uint8_t slaveBuffer_raw[EV_LEN];
 
 uint32_t specialKey1;
 uint32_t specialKey2;
@@ -223,8 +225,11 @@ Leds leds;
 MidiSender sender(sendMidi);
 MidiReceiver receiver(recMidi, &sender);
 
-MidiLoop masterLoop(midiEvents, EV_LEN, sender);
-MidiLoop slaveLoop(midiEvents2, EV_LEN, sender, &masterLoop);
+MidiEventMasterBuffer masterBuffer(masterBuffer_raw, EV_LEN);
+MidiEventSlaveBuffer slaveBuffer(slaveBuffer_raw, EV_LEN);
+
+MidiLoop masterLoop(masterBuffer, sender);
+MidiLoop slaveLoop(slaveBuffer, sender, &masterLoop);
 
 SystemOut sysOut(usart1send);
 

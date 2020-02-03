@@ -30,7 +30,7 @@ SOFTWARE.
 #include "MidiLoop.h"
 #include <stdio.h>
 
-MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength, MidiSender& sender,
+MidiLoop::MidiLoop(MidiEventBuffer& buf, MidiSender& sender,
 		MidiLoop const * const masterPtr) :
 		currentState(state),
 		currentTime(_currentTime),
@@ -38,28 +38,36 @@ MidiLoop::MidiLoop(MidiEvent* buf, uint32_t bufLength, MidiSender& sender,
 		isSecondHalf(_isSecondHalf),
 		loopFull(_loopFull),
 		stateChangeRequested(beginLoopRequested),
-		buf(buf), bufLength(bufLength),
+		buf(buf),
 		_currentTime(0), currentMasterLoop(0),
 		_loopEndTime(0), loopEndTimeHalf(0), _isSecondHalf(false),
 		masterLoopCount(0), eventCount(0), playIdx(0), sendEventPending(false),
 		sender(sender), masterPtr(masterPtr),
 		state(RECORDING), noteOnOffCount(0),
-		beginLoopRequested(false), deltaTime(0), lastMasterTime(0) {
+		beginLoopRequested(false), deltaTime(0),
+		firstEventTime(0), firstEventMasterLoop(0)
+{
 	//printf("MidiLoop: buf=%u, bufLength=%u", buf, bufLength);
 }
 
-MidiLoop::~MidiLoop() {
+MidiLoop::~MidiLoop()
+{
 }
 
-uint32_t MidiLoop::midiTimeTick() {
+uint32_t MidiLoop::midiTimeTick()
+{
 	if(!masterPtr)
 	{
-		if (_currentTime < _loopEndTime) {
+		if (_currentTime < _loopEndTime)
+		{
 			_currentTime++;
 			_isSecondHalf = (_currentTime >= loopEndTimeHalf);
-		} else {
+		}
+		else
+		{
 			_currentTime = 0;
 			_isSecondHalf = false;
+			buf.reset();
 			playIdx = 0;
 			noteOnOffCount = 0;
 		}
@@ -82,16 +90,18 @@ void MidiLoop::slaveMidiTimeTick()
 	{
 		currentMasterLoop++;
 
-		if (currentMasterLoop >= masterLoopCount) {
+		if (currentMasterLoop >= masterLoopCount)
+		{
 			currentMasterLoop = 0;
 		}
 	}
 
 	_currentTime = masterTime;
 
-	if (eventCount > 0 && buf[0].time == _currentTime &&
-			buf[0].loopIdx == currentMasterLoop)
+	if (eventCount > 0 && firstEventTime == _currentTime &&
+			firstEventMasterLoop == currentMasterLoop)
 	{
+		buf.reset();
 		playIdx = 0;
 		noteOnOffCount = 0;
 	}
@@ -102,25 +112,32 @@ void MidiLoop::shiftMasterTime(uint32_t& masterTime)
 	uint32_t maxMasterTime = masterPtr->loopEndTime;
 	int32_t tmp = (int32_t) masterTime + deltaTime;
 
-	if (tmp < 0) {
+	if (tmp < 0)
+	{
 		tmp = tmp + maxMasterTime + 1;
-	} else if (tmp > (int32_t) maxMasterTime) {
+	}
+	else if (tmp > (int32_t) maxMasterTime)
+	{
 		tmp = tmp - maxMasterTime - 1;
 	}
 
 	masterTime = (uint32_t) tmp;
 }
 
-void MidiLoop::beginLoop() {
-	if (state != PLAYING) {
+void MidiLoop::beginLoop()
+{
+	if (state != PLAYING)
+	{
 		return;
 	}
 
 	beginLoopRequested = true;
 }
 
-void MidiLoop::endLoop() {
-	if (state != RECORDING) {
+void MidiLoop::endLoop()
+{
+	if (state != RECORDING)
+	{
 		return;
 	}
 
@@ -130,16 +147,17 @@ void MidiLoop::endLoop() {
 
 	if (masterPtr/*this is slave*/ && eventCount > 0)
 	{
-		const auto& lastEvent = buf[eventCount - 1];
+		const auto& lastEvent = buf.event;
 		currentMasterLoop = 0;
 		// calculate time shift
-		deltaTime = (int32_t) (buf[0].time) - (int32_t) _currentTime;
+		deltaTime = (int32_t) (firstEventTime) - (int32_t) _currentTime;
 		// loop as short as possible
 		_loopEndTime = lastEvent.time;
 		masterLoopCount = lastEvent.loopIdx + 1;
 		// play first event immediately
-		_currentTime = buf[0].time;
+		_currentTime = firstEventTime;
 		playIdx = 0;
+		buf.reset();
 	}
 
 	loopEndTimeHalf = _loopEndTime >> 1;
@@ -147,20 +165,19 @@ void MidiLoop::endLoop() {
 	_loopFull = false;
 }
 
-void MidiLoop::midiEvent(char b1, char b2, char b3) {
-	if (state != RECORDING) {
+void MidiLoop::midiEvent(char b1, char b2, char b3)
+{
+	if (state != RECORDING)
+	{
 		return;
 	}
 
-	if (eventCount < bufLength) {
-		MidiEvent& event = buf[eventCount];
-
-		event.b1 = b1;
-		event.b2 = b2;
-		event.b3 = b3;
-
-		if (eventCount == 0) {
-			if (!masterPtr/*this is master*/) {
+	if (!buf.eof)
+	{
+		if (eventCount == 0)
+		{
+			if (!masterPtr/*this is master*/)
+			{
 				_currentTime = 0;
 			}
 
@@ -168,63 +185,92 @@ void MidiLoop::midiEvent(char b1, char b2, char b3) {
 			loopEndTimeHalf = _loopEndTime >> 1;
 			currentMasterLoop = 0;
 			masterLoopCount = 0xFFFFFFFF;
+			// memorize first event timing parameters
+			firstEventTime = _currentTime;
+			firstEventMasterLoop = currentMasterLoop;
+
+			buf.reset();
 		}
+		else
+		{
+			buf.nextEventToWrite();
+		}
+
+		MidiEvent& event = buf.event;
+
+		event.b1 = b1;
+		event.b2 = b2;
+		event.b3 = b3;
+
 		//printf("ev, t=%X, l=%X\r\n", _currentTime, currentMasterLoop);
 		//printf("e=%X\r\n",b2);
 		event.time = _currentTime;
 		event.loopIdx = currentMasterLoop;
+		buf.saveEvent();
 		eventCount++;
-	} else {
+	}
+	else
+	{
 		_loopFull = true;
 	}
 }
 
 void MidiLoop::play() {
-	MidiEvent& event = buf[playIdx];
+	MidiEvent& event = buf.event;
 
-	if (!sendEventPending) {
+	if (!sendEventPending)
+	{
 		bool fireCondition = ((event.time == _currentTime)
 				&& (event.loopIdx == currentMasterLoop));
 
-		if (fireCondition) {
+		if (fireCondition)
+		{
 			sendEventPending = true;
 		}
 	}
 
-	if (sendEventPending) {
-		if (sender.sendMidi(event.b1, event.b2, event.b3)) {
-
-//			printf("b2=%X, b3=%X, idx=%X, ct=%X, et=%X\r\n",
-//			  event.b2, event.b3, playIdx, _currentTime, event.time);
+	if (sendEventPending)
+	{
+		if (sender.sendMidi(event.b1, event.b2, event.b3))
+		{
+			//printf("play(): time=%X\r\n", _currentTime);
 
 			// on/off counting
-			if (((event.b1 & 0xF0) == 0x90) && event.b3 > 0) {
+			if (((event.b1 & 0xF0) == 0x90) && event.b3 > 0)
+			{
 				noteOnOffCount++;
 			} else if (((event.b1 & 0xF0) == 0x80
-					|| (((event.b1 & 0xF0) == 0x90) && event.b3 == 0))) {
+					|| (((event.b1 & 0xF0) == 0x90) && event.b3 == 0)))
+			{
 				noteOnOffCount--;
 			}
 
 			// ready to send next event
 			sendEventPending = false;
 
-			if ((playIdx + 1) < eventCount) {
+			if ((playIdx + 1) < eventCount)
+			{
+				buf.nextEventToRead();
 				playIdx++;
 			}
 			else
 			{
+				buf.reset();
 				playIdx = 0;
 			}
 		}
 	}
 }
 
-void MidiLoop::tick() {
-	if (state == PLAYING && eventCount > 0) {
+void MidiLoop::tick()
+{
+	if (state == PLAYING && eventCount > 0)
+	{
 		play();
 	}
 
-	if (beginLoopRequested && noteOnOffCount == 0) {
+	if (beginLoopRequested && noteOnOffCount == 0)
+	{
 		beginLoopRequested = false;
 		state = RECORDING;
 		eventCount = 0;
